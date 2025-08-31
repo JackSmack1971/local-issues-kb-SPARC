@@ -4,13 +4,16 @@ import logging
 import re
 import time
 import uuid
-from typing import Any, Dict, List
-from urllib.parse import urljoin
+from typing import Any, Dict, List, Optional
+from urllib.parse import urljoin, urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
 
 from emit_issue import sha1, write_issues_batch
+
+
+ALLOWED_LANGS = {'java', 'js', 'ts', 'py'}
 
 
 def clean_html(s: str) -> str:
@@ -51,13 +54,36 @@ def fetch_with_retry(
     raise RuntimeError('unreachable')
 
 
-def main() -> None:
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument('--base', default='https://sonarcloud.io')
     ap.add_argument('--langs', default='java,js,ts,py')
     ap.add_argument('--page-size', type=int, default=500)
     ap.add_argument('--limit', type=int, default=1000)
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
+
+    parsed = urlparse(args.base)
+    if parsed.scheme != 'https' or not parsed.hostname:
+        raise ValueError('--base must be an https URL with a valid hostname')
+    if not re.fullmatch(r'[A-Za-z0-9.-]+', parsed.hostname):
+        raise ValueError('--base must be an https URL with a valid hostname')
+    args.base = f'https://{parsed.netloc}'
+
+    langs = [x.strip() for x in args.langs.split(',') if x.strip()]
+    for lang in langs:
+        if lang not in ALLOWED_LANGS:
+            raise ValueError(f'unsupported language: {lang}')
+    args.langs = langs
+
+    if not 1 <= args.page_size <= 500:
+        raise ValueError('--page-size must be between 1 and 500')
+    if not 1 <= args.limit <= 5000:
+        raise ValueError('--limit must be between 1 and 5000')
+    return args
+
+
+def main() -> None:
+    args = parse_args()
 
     cid = uuid.uuid4().hex
     logger = get_logger(cid)
@@ -68,7 +94,7 @@ def main() -> None:
     session.mount('https://', adapter)
 
     total = 0
-    for lang in [x.strip() for x in args.langs.split(',') if x.strip()]:
+    for lang in args.langs:
         p = 1
         seen = 0
         while True:

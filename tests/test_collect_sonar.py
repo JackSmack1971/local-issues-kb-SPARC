@@ -43,3 +43,27 @@ def test_fetch_with_retry_failure(monkeypatch):
     logger = collect_sonar.get_logger('test')
     with pytest.raises(requests.RequestException):
         collect_sonar.fetch_with_retry(session, 'http://example', {}, logger, max_attempts=2)
+
+
+def test_invalid_base_url():
+    with pytest.raises(ValueError):
+        collect_sonar.parse_args(['--base', 'http://example.com'])
+
+
+def test_unknown_language():
+    with pytest.raises(ValueError):
+        collect_sonar.parse_args(['--langs', 'java,foo'])
+
+
+@pytest.mark.parametrize(
+    'argv',
+    [
+        ['--page-size', '0'],
+        ['--page-size', '501'],
+        ['--limit', '0'],
+        ['--limit', '5001'],
+    ],
+)
+def test_numeric_range(argv):
+    with pytest.raises(ValueError):
+        collect_sonar.parse_args(argv)
