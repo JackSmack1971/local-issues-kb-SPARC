@@ -1,0 +1,37 @@
+{
+  "issue_id": "sonar_demo_py_S000",
+  "source": "sonar",
+  "source_rule_id": "python:S000",
+  "language": "py",
+  "title": "Example Python rule (demo)",
+  "summary": "Demonstration record for pipeline testing.",
+  "root_cause": null,
+  "fix_steps": "Apply the recommended pattern shown in linked docs.",
+  "autofix_snippet": null,
+  "severity": "INFO",
+  "confidence": 0.8,
+  "taxonomy": {
+    "cwe": [],
+    "owasp": []
+  },
+  "frequency": 0,
+  "signals": [
+    {
+      "kind": "rule_id",
+      "value": "python:S000"
+    }
+  ],
+  "references": [
+    {
+      "label": "Demo",
+      "url": "https://example.local/demo",
+      "license": null
+    }
+  ],
+  "metadata": {
+    "tags": [
+      "demo"
+    ]
+  },
+  "updated_at": "2025-08-31T14:10:35Z"
+}
