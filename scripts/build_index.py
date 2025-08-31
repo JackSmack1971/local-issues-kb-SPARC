@@ -1,4 +1,5 @@
 import sqlite3, json, pathlib
+from json_utils import load_json
 
 ROOT = pathlib.Path('issuesdb')
 DB   = ROOT / 'issues.sqlite'
@@ -6,8 +7,7 @@ SQL  = pathlib.Path('issues_index.sql')
 
 def iter_docs():
     for p in (ROOT / 'issues').glob('*/*/*.json'):
-        with p.open('r', encoding='utf-8') as f:
-            yield json.load(f)
+        yield load_json(p)
 
 con = sqlite3.connect(DB)
 cur = con.cursor()
