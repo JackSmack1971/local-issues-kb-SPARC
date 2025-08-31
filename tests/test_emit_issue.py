@@ -56,3 +56,34 @@ def test_write_issues_batch_atomic(monkeypatch, tmp_path):
     with pytest.raises(ValueError):
         emit_issue.write_issues_batch(docs)
     assert not list(tmp_path.rglob('*.json'))
+
+
+def test_write_issue_too_big(monkeypatch, tmp_path):
+    monkeypatch.setattr(emit_issue, 'ROOT', tmp_path)
+    monkeypatch.setattr(emit_issue, 'MAX_JSON_BYTES', 10)
+    doc = {
+        'issue_id': 'a' * 40,
+        'source': 'src',
+        'title': 'ok',
+        'payload': 'x' * 20,
+    }
+    with pytest.raises(ValueError):
+        emit_issue.write_issue(doc)
+    assert not list(tmp_path.rglob('*.json'))
+
+
+def test_write_issues_batch_too_big(monkeypatch, tmp_path):
+    monkeypatch.setattr(emit_issue, 'ROOT', tmp_path)
+    monkeypatch.setattr(emit_issue, 'MAX_JSON_BYTES', 10)
+    docs = [
+        {
+            'issue_id': 'a' * 40,
+            'source': 'src',
+            'title': 'ok',
+            'payload': 'x' * 20,
+        },
+        {'issue_id': 'b' * 40, 'source': 'src', 'title': 'ok'},
+    ]
+    with pytest.raises(ValueError):
+        emit_issue.write_issues_batch(docs)
+    assert not list(tmp_path.rglob('*.json'))
