@@ -1,1 +1,40 @@
-# local-issues-kb-SPARC
+# Local Issues→Fixes KB (File-First, Agent-Ready)
+
+This repository is a local-only, file-first knowledge base for programming issues → fixes, optimized for LLM agent ingestion and fast local search.
+
+## Key Design
+- Files are truth: one JSON file per issue under `issuesdb/issues/<source>/<language>/<issue_id>.json`.
+- Search index: a single SQLite database with FTS5 (`issuesdb/issues.sqlite`) built from files.
+- Agent-ready chunks: export to `exports/chunks.jsonl` (one record per chunk with metadata).
+
+## Quick Start
+```bash
+pip install -r requirements.txt
+python scripts/collect_sonar.py --base https://sonarcloud.io --langs py --limit 200
+python scripts/build_index.py
+python scripts/chunk_export.py
+python scripts/render_memory_bank.py
+```
+
+## Layout
+```
+.
+├─ issuesdb/
+│  ├─ issues/
+│  │  └─ <source>/<language>/<issue_id>.json
+│  └─ issues.sqlite
+├─ memory_bank/
+│  ├─ productContext.md
+│  ├─ systemPatterns.md
+│  ├─ decisionLog.md
+│  └─ progress.md
+├─ schemas/
+│  ├─ issue.schema.json
+│  └─ chunk.schema.json
+└─ scripts/
+   ├─ collect_sonar.py
+   ├─ emit_issue.py
+   ├─ build_index.py
+   ├─ chunk_export.py
+   └─ render_memory_bank.py
+```
