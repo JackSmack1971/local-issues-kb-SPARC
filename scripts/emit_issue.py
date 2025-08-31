@@ -5,6 +5,8 @@ import pathlib
 import re
 from typing import Any, Dict, Iterable, List
 
+from json_utils import MAX_JSON_BYTES
+
 ROOT = pathlib.Path('issuesdb/issues').resolve()
 ISSUE_ID_PATTERN = re.compile(r'^[a-f0-9]{40}$')
 
@@ -30,8 +32,13 @@ def write_issue(doc: Dict[str, Any]) -> pathlib.Path:
         path.relative_to(out)
     except ValueError as exc:
         raise ValueError('resolved path escapes target directory') from exc
+    json_blob = json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True)
+    if len(json_blob) > MAX_JSON_BYTES:
+        raise ValueError(
+            f'document exceeds {MAX_JSON_BYTES} bytes (size={len(json_blob)})'
+        )
     with path.open('w', encoding='utf-8') as f:
-        json.dump(doc, f, ensure_ascii=False, indent=2, sort_keys=True)
+        f.write(json_blob)
     return path
 
 
@@ -61,8 +68,13 @@ def write_issues_batch(docs: Iterable[Dict[str, Any]]) -> List[pathlib.Path]:
             path = (out / f'{issue_id}.json').resolve()
             path.relative_to(out)
             tmp = path.with_suffix('.json.tmp')
+            json_blob = json.dumps(doc, ensure_ascii=False, indent=2, sort_keys=True)
+            if len(json_blob) > MAX_JSON_BYTES:
+                raise ValueError(
+                    f'document exceeds {MAX_JSON_BYTES} bytes (size={len(json_blob)})'
+                )
             with tmp.open('w', encoding='utf-8') as f:
-                json.dump(doc, f, ensure_ascii=False, indent=2, sort_keys=True)
+                f.write(json_blob)
             paths.append(path)
             temp_paths.append(tmp)
         for tmp, final in zip(temp_paths, paths):
