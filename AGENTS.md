@@ -1,149 +1,128 @@
 # AGENTS.md: AI Collaboration Guide
 
-This document provides essential context for AI models interacting with this project. Adhering to these guidelines will ensure consistency, maintain code quality, and optimize agent performance.
-
-*It is Sunday, August 31, 2025. This guide is optimized for clarity, efficiency, and maximum utility for modern AI coding agents like OpenAI's Codex, GitHub Copilot Workspace, and Claude.*
-
-*This file should be placed at the root of your repository. More deeply-nested AGENTS.md files (e.g., in subdirectories) will take precedence for specific sub-areas of the codebase. Direct user prompts will always override instructions in this file.*
+This document provides essential context for AI models interacting with this project. Adhering to these guidelines will ensure consistency, maintain code quality, and optimize agent performance for the Issues→Fixes Knowledge Base system.
 
 ## 1. Project Overview & Purpose
-
-*   **Primary Goal:** Maintain a local-only, file-first knowledge base for programming issues → fixes, optimized for LLM agent ingestion and fast local search.
-*   **Business Domain:** Developer tooling, AI/LLM integration, static analysis, code quality knowledge management.
-*   **Key Features:** Issue collection from multiple sources (SonarCloud, etc.), local SQLite FTS5 search, chunked export for LLM consumption, memory bank generation for agent context, schema-validated JSON storage.
+*   **Primary Goal:** Maintain a local, file-first knowledge base for programming issues → fixes, optimized for AI agent ingestion and fast local search using SQLite FTS5.
+*   **Business Domain:** Developer Tools, Knowledge Management, AI/ML Infrastructure for Code Analysis.
+*   **Key Features:** Issue collection from multiple sources, SQLite FTS5 full-text search, LLM-ready chunk export, memory bank generation, license-aware data attribution.
 
 ## 2. Core Technologies & Stack
-
-*   **Languages:** Python 3.7+ (primary)
-*   **Frameworks & Runtimes:** Command-line utilities, no web framework
-*   **Databases:** SQLite with FTS5 (full-text search) for indexing, JSON files as source of truth
-*   **Key Libraries/Dependencies:** requests>=2.32.2 (HTTP client), pyyaml>=6.0.1 (YAML parsing), sqlite3 (built-in), json (built-in), pathlib (built-in), hashlib (built-in), datetime (built-in), argparse (built-in)
-*   **Package Manager:** pip
-*   **Platforms:** Cross-platform (Python-based, tested on systems with Python 3.7+)
+*   **Languages:** Python 3.x (primary), SQL (SQLite with FTS5 extension).
+*   **Frameworks & Runtimes:** SQLite with FTS5 virtual tables, standard Python libraries.
+*   **Databases:** SQLite with FTS5 extension for full-text search indexing.
+*   **Key Libraries/Dependencies:** `requests>=2.32.2` (API collection), `pyyaml>=6.0.1` (YAML processing), `sqlite3` (built-in), `json`, `pathlib`, `hashlib`.
+*   **Package Manager:** pip (using `requirements.txt`).
+*   **Platforms:** Cross-platform Python (Linux, macOS, Windows) with local-only operation.
 
 ## 3. Architectural Patterns & Structure
-
-*   **Overall Architecture:** File-first data pipeline with SQLite indexing. Files are the authoritative source of truth; SQLite provides fast search capabilities; exports enable LLM consumption.
+*   **Overall Architecture:** File-first data storage with SQLite FTS5 indexing. Files are the source of truth, SQLite provides fast search capabilities, and exports enable LLM integration.
 *   **Directory Structure Philosophy:**
-    *   `/issuesdb/issues/<source>/<language>/`: One JSON file per issue (source of truth)
-    *   `/issuesdb/issues.sqlite`: SQLite FTS5 search index built from JSON files
-    *   `/exports/`: Generated outputs for LLM consumption (chunks.jsonl)
-    *   `/memory_bank/`: Generated markdown files providing agent context
-    *   `/schemas/`: JSON schemas for data validation
-    *   `/scripts/`: Collection, processing, and export utilities
-*   **Module Organization:** Simple script-based architecture with clear separation of concerns: collection (`collect_sonar.py`), indexing (`build_index.py`), export (`chunk_export.py`), context generation (`render_memory_bank.py`), and utilities (`emit_issue.py`).
-*   **Common Patterns & Idioms:**
-    *   **File-First Approach:** JSON files are authoritative; database is derived/cached
-    *   **Schema Validation:** All data follows JSON Schema specifications
-    *   **Deterministic IDs:** SHA1 hashing for consistent issue identification
-    *   **Chunking:** Text segmentation for LLM consumption (max 1400 chars)
-    *   **UTC Timestamps:** ISO format with 'Z' suffix for consistency
+    *   `/issuesdb`: Main data directory containing issues and search index.
+    *   `/issuesdb/issues/<source>/<language>/`: Individual JSON issue files organized by source and language.
+    *   `/scripts`: Collection, processing, and export utilities.
+    *   `/schemas`: JSON schema validation files.
+    *   `/memory_bank`: Generated context files for AI agents.
+    *   `/exports`: LLM-ready chunk exports.
+*   **Module Organization:** Script-based architecture with each Python script handling a specific workflow stage (collect, build, export, render).
+*   **Common Patterns & Idioms:** 
+    *   **File-first approach:** JSON files are canonical data source, database is derived.
+    *   **SQLite FTS5:** Contentless FTS tables with external content references for space efficiency.
+    *   **Chunking strategy:** Text chunked at paragraph boundaries with max 1400 characters.
+    *   **Schema validation:** JSON schemas enforce data structure consistency.
 
 ## 4. Coding Conventions & Style Guide
+*   **Formatting:** Follow PEP 8 Python style guide. Use 4-space indentation, 100-character line limit. Prefer f-strings for string formatting.
+*   **Naming Conventions:** 
+    *   Variables, functions: `snake_case` (e.g., `issue_id`, `write_issue`)
+    *   Classes: `PascalCase` (minimal usage in this codebase)
+    *   Constants: `SCREAMING_SNAKE_CASE` (e.g., `MAX_CHARS`, `ROOT`)
+    *   Files: `snake_case.py`
+*   **API Design Principles:** Simple, functional approach with clear input/output contracts. Functions should have single responsibilities and be easily testable.
+*   **Documentation Style:** Use docstrings for complex functions. Inline comments for SQLite FTS5 specific optimizations and business logic.
+*   **Error Handling:** Use assertions for preconditions (`assert 'issue_id' in doc`). Use try/except for external API calls and file operations. Fail fast with descriptive error messages.
+*   **Forbidden Patterns:** **NEVER** hardcode API keys or secrets in source code. **DO NOT** modify SQLite schema without considering FTS5 implications from the ruleset.
 
-*   **Formatting:** Follow PEP 8. Use 4-space indentation. Max line length appears to be flexible (some long lines present). *Inferred: Consider adding Black/autopep8 for consistency.*
-*   **Naming Conventions:** Python standard - snake_case for variables, functions, and files; SCREAMING_SNAKE_CASE for constants; PascalCase for classes (when used).
-*   **API Design Principles:** Simple, functional approach with clear data contracts. Functions should be single-purpose and composable.
-*   **Documentation Style:** Use docstrings for public functions. Include type hints where beneficial. *Currently inferred - not consistently present in codebase.*
-*   **Error Handling:** Use appropriate exceptions; validate inputs with assertions for critical requirements; use `raise_for_status()` for HTTP operations; handle file operations with proper encoding.
-*   **Data Handling:** Always use `encoding='utf-8'` for file operations; use `ensure_ascii=False` for JSON serialization; sort JSON keys for consistency.
-*   **Forbidden Patterns:** **NEVER** hardcode sensitive information (API keys, secrets). **NEVER** modify the core schema without updating validators.
+## 5. Key Files & Entrypoints
+*   **Main Scripts:** 
+    *   `scripts/collect_sonar.py`: Collects issues from SonarCloud API
+    *   `scripts/build_index.py`: Builds SQLite FTS5 search index from JSON files
+    *   `scripts/chunk_export.py`: Exports issues to LLM-friendly chunks
+    *   `scripts/render_memory_bank.py`: Generates memory bank context files
+*   **Configuration:** 
+    *   `requirements.txt`: Python dependencies
+    *   `schemas/*.json`: JSON validation schemas
+    *   `issues_index.sql`: SQLite FTS5 schema definition
+*   **Data Storage:**
+    *   `issuesdb/issues.sqlite`: SQLite database with FTS5 search index
+    *   `issuesdb/issues/<source>/<language>/<issue_id>.json`: Individual issue files
 
-## 5. Development & Testing Workflow
-
-*   **Local Development Setup:**
-    1. Ensure Python 3.7+ is installed
-    2. Create virtual environment: `python3 -m venv .venv && source .venv/bin/activate` (Linux/Mac) or `.venv\Scripts\activate` (Windows)
-    3. Install dependencies: `pip install -r requirements.txt`
-    4. Run the standard workflow pipeline as needed (see workflow below)
-*   **Build Commands:** No traditional build process - this is a data pipeline project.
-*   **Standard Workflow Pipeline:**
+## 6. Development & Testing Workflow
+*   **Local Development Environment:** 
     ```bash
-    # Collect issues from sources
+    # Setup
+    pip install -r requirements.txt
+    
+    # Full workflow
     python scripts/collect_sonar.py --base https://sonarcloud.io --langs py --limit 200
-    
-    # Build search index
     python scripts/build_index.py
-    
-    # Export chunks for LLM consumption
     python scripts/chunk_export.py
-    
-    # Generate memory bank context
     python scripts/render_memory_bank.py
     ```
-*   **Testing Commands:** *Note: No test files currently present in the codebase. This is an area for improvement.*
-    *   **SHOULD ADD:** Unit tests for core functions (chunking, schema validation, data processing)
-    *   **SHOULD ADD:** Integration tests for the full pipeline
-    *   **Suggested:** `python -m pytest tests/` (after implementing tests)
-*   **Linting/Formatting Commands:** *Inferred - not currently configured*
-    *   **SHOULD ADD:** `python -m black .` for formatting
-    *   **SHOULD ADD:** `python -m flake8 .` for linting
-    *   **SHOULD ADD:** `python -m isort .` for import sorting
-*   **CI/CD Process Overview:** *Not currently implemented - suggested for future enhancement.*
+*   **Task Configuration:** Each script is self-contained with command-line arguments. Use `--help` flag for script-specific options.
+*   **Testing:** **All new functionality requires corresponding tests.** Test file structure should mirror source structure. Use `pytest` for testing framework. **CRITICAL:** Mock external API calls to prevent rate limiting and ensure deterministic tests.
+*   **Quality Gates:**
+    *   JSON schema validation (enforced in `write_issue()`)
+    *   SQLite FTS5 integrity checks (`INSERT INTO table(table) VALUES('integrity-check')`)
+    *   Ensure ≥1 signal per issue
+    *   License attribution for all references
+*   **CI/CD Process:** Manual workflow currently. Future: GitHub Actions for automated testing and data refresh.
 
-## 6. Git Workflow & PR Instructions
-
-*   **Pre-Commit Checks:** *Inferred recommendations:*
-    *   **SHOULD:** Run schema validation on any modified JSON files
-    *   **SHOULD:** Ensure all scripts execute without errors
-    *   **SHOULD:** Test the full pipeline if core functionality is modified
-*   **Branching Strategy:** *Not explicitly defined - recommend standard Git flow*
-*   **Commit Messages:** *No specific format enforced - suggest conventional commits:*
-    *   Use clear, descriptive messages
-    *   Follow format: `type: brief description` (e.g., `feat: add new data source`, `fix: handle encoding issues`)
-*   **Pull Request (PR) Process:** *Not currently defined - suggest standard practices*
-*   **Force Pushes:** **NEVER** use `git push --force` on shared branches
-*   **Clean State:** **You MUST leave your worktree in a clean state after completing a task.**
-
-## 7. Security Considerations
-
-*   **General Security Practices:** **Be mindful of security** when handling file I/O, HTTP requests, and external data sources.
-*   **Sensitive Data Handling:** **Do NOT** hardcode API keys, URLs with credentials, or other sensitive information. Use environment variables or configuration files (excluded from version control).
-*   **Input Validation:** **ALWAYS** validate JSON data against schemas. Sanitize any user-provided input before processing.
-*   **Vulnerability Avoidance:** Be cautious with:
-    *   HTTP requests to external sources (validate SSL, handle timeouts)
-    *   File path construction (prevent directory traversal)
-    *   JSON parsing (handle malformed data gracefully)
-*   **Dependency Management:** Keep dependencies updated. Regularly scan for vulnerabilities in `requests` and other external packages.
-
-## 8. Specific Agent Instructions & Known Issues
-
-*   **Tool Usage:**
-    *   Use `python scripts/emit_issue.py` utilities for creating new issue documents
-    *   Always validate new issues against `schemas/issue.schema.json`
-    *   Use `pathlib` for file operations (already established pattern)
-*   **Context Management:** 
-    *   For large datasets, process in batches to avoid memory issues
-    *   When modifying schemas, ensure backward compatibility or provide migration scripts
-*   **Quality Assurance & Verification:** 
-    *   **ALWAYS** run the full pipeline after making changes to core scripts
-    *   **MUST** validate JSON schema compliance for any new or modified issue documents
-    *   **MUST** ensure SQLite index rebuilds successfully after structural changes
-*   **Project-Specific Quirks/Antipatterns:**
-    *   Files are source of truth - **NEVER** modify the SQLite database directly
-    *   Issue IDs are deterministic (SHA1-based) - don't generate random IDs
-    *   Chunking logic has specific paragraph-based splitting - preserve this behavior
-    *   UTC timestamps must include 'Z' suffix for consistency
+## 7. Specific Instructions for AI Collaboration
+*   **SQLite FTS5 Requirements:** **CRITICAL - Follow sqlite_fts5_ruleset.md guidelines:**
+    *   Use explicit column definitions in FTS5 virtual tables
+    *   Implement porter stemming tokenizer for English content search
+    *   Use prefix indexes (`prefix='2 3 4'`) for autocomplete functionality
+    *   Maintain contentless FTS tables with external content references
+    *   Use `bm25()` function for relevance ranking
+    *   Run integrity checks after bulk operations
+    *   Configure appropriate tokenizers based on content type
 *   **Data Collection Guidelines:**
-    *   Always include proper attribution and licensing information in `references`
-    *   Ensure at least one signal per issue for searchability
-    *   Follow the established directory structure: `<source>/<language>/<issue_id>.json`
-*   **Memory Bank Integration:** 
-    *   The generated memory bank files (`/memory_bank/*.md`) provide context for other AI agents
-    *   These files are auto-generated and should not be manually edited
-    *   Update the rendering logic in `scripts/render_memory_bank.py` for structural changes
-
-## Development Priorities
-
-**Immediate improvements recommended:**
-1. Add comprehensive test suite
-2. Implement linting and formatting configuration  
-3. Add CI/CD pipeline for automated validation
-4. Document API endpoints for external data sources
-5. Add configuration management for different environments
-
-**Agent Focus Areas:**
-- Maintain file-first architecture principles
-- Ensure schema compliance for all data operations
-- Preserve deterministic behavior for reproducible results
-- Optimize for LLM consumption patterns in exports
+    *   Always include rate limiting (`time.sleep(0.15)`) for API calls
+    *   Clean HTML content using `clean_html()` utility function
+    *   Validate all collected data against JSON schemas before writing
+    *   Include license attribution in references array
+    *   Use `sha1()` for generating deterministic issue IDs
+*   **Security:** 
+    *   **Local-only operation** - no external dependencies in production usage
+    *   Validate and sanitize all external data inputs (HTML cleaning, JSON validation)
+    *   **DO NOT** hardcode API endpoints or credentials - use command-line parameters
+    *   Be mindful of PII when processing issue descriptions
+*   **Dependencies:** Use `pip install <package>` and update `requirements.txt` with version constraints (`>=x.x.x`).
+*   **Commit Messages & Pull Requests:** Follow conventional commits format (`feat:`, `fix:`, `docs:`). Include: What changed? Why? Breaking changes?
+*   **Avoidances/Forbidden Actions:**
+    *   **DO NOT** modify SQLite schema without consulting FTS5 ruleset
+    *   **DO NOT** commit API keys or secrets to repository
+    *   **NEVER** bypass JSON schema validation in data pipeline
+    *   **DO NOT** modify existing issue files directly - use pipeline for updates
+*   **Quality Assurance & Verification:** 
+    *   **ALWAYS** run `python scripts/build_index.py` after data changes
+    *   Verify SQLite FTS5 integrity: `INSERT INTO issues_fts(issues_fts) VALUES('integrity-check')`
+    *   Test search functionality with sample queries after index changes
+    *   Validate chunk export produces valid JSONL format
+*   **Debugging Guidance:** 
+    *   For SQLite issues: Use `.schema` and `PRAGMA table_info()` to inspect structure
+    *   For FTS5 problems: Check `sqlite_fts5_ruleset.md` for optimization guidance
+    *   For API collection errors: Include full response headers and status codes
+    *   Use `json.dumps(obj, indent=2)` for readable JSON debugging output
+*   **Project-Specific Quirks:**
+    *   Issue IDs are SHA1 hashes for deterministic generation
+    *   FTS5 uses contentless tables - content stored in main `issues` table
+    *   Chunk export uses paragraph-boundary splitting with 1400 char max
+    *   Memory bank files are auto-generated - modify templates in render script
+    *   HTML cleaning removes script/style tags and converts entities
+*   **Performance Considerations:**
+    *   Batch SQLite operations using transactions
+    *   Use FTS5 `merge` operations for index optimization after bulk updates
+    *   Configure FTS5 `automerge` and `crisismerge` for production usage
+    *   Monitor SQLite database size and consider `VACUUM` for cleanup
