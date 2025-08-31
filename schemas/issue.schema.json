@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Issue Document",
+  "type": "object",
+  "required": [
+    "issue_id",
+    "source",
+    "title"
+  ],
+  "properties": {
+    "issue_id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "source_rule_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "language": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "summary": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "root_cause": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fix_steps": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "autofix_snippet": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "severity": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "confidence": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "taxonomy": {
+      "type": "object"
+    },
+    "frequency": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "signals": {
+      "type": "array"
+    },
+    "references": {
+      "type": "array"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

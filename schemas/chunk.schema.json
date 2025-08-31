@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LLM Chunk",
+  "type": "object",
+  "required": [
+    "id",
+    "doc_id",
+    "chunk_ix",
+    "text"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "doc_id": {
+      "type": "string"
+    },
+    "chunk_ix": {
+      "type": "integer"
+    },
+    "text": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
