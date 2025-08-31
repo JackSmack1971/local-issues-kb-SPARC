@@ -32,3 +32,27 @@ def test_write_issue_path_traversal(monkeypatch, tmp_path):
     with pytest.raises(ValueError):
         emit_issue.write_issue(doc)
     assert not list(tmp_path.rglob('passwd'))
+
+
+def test_write_issues_batch_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(emit_issue, 'ROOT', tmp_path)
+    docs = [
+        {'issue_id': 'a' * 40, 'source': 'src', 'title': 'one'},
+        {'issue_id': 'b' * 40, 'source': 'src', 'title': 'two'},
+    ]
+    paths = emit_issue.write_issues_batch(docs)
+    assert len(paths) == 2
+    for doc in docs:
+        path = tmp_path / 'src' / 'unknown' / (doc['issue_id'] + '.json')
+        assert path.exists()
+
+
+def test_write_issues_batch_atomic(monkeypatch, tmp_path):
+    monkeypatch.setattr(emit_issue, 'ROOT', tmp_path)
+    docs = [
+        {'issue_id': 'c' * 40, 'source': 'src', 'title': 'ok'},
+        {'issue_id': 'invalid', 'source': 'src', 'title': 'bad'},
+    ]
+    with pytest.raises(ValueError):
+        emit_issue.write_issues_batch(docs)
+    assert not list(tmp_path.rglob('*.json'))
