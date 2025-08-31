@@ -16,6 +16,16 @@ python scripts/chunk_export.py
 python scripts/render_memory_bank.py
 ```
 
+## Security Scan
+
+Scan the repository for potential secrets, missing input validation, and unsafe SQL usage:
+
+```bash
+python scripts/security_scan.py scripts
+```
+
+The command exits with a non-zero status when issues are found so it can be used in CI workflows.
+
 ## Layout
 ```
 .
@@ -36,5 +46,6 @@ python scripts/render_memory_bank.py
    ├─ emit_issue.py
    ├─ build_index.py
    ├─ chunk_export.py
-   └─ render_memory_bank.py
+   ├─ render_memory_bank.py
+   └─ security_scan.py
 ```
