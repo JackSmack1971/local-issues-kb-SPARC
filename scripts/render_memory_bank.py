@@ -1,4 +1,5 @@
 import pathlib, json, datetime
+from json_utils import load_json
 
 ROOT = pathlib.Path('.')
 MB   = ROOT / 'memory_bank'
@@ -8,8 +9,7 @@ def count_docs():
     total = 0; by_source = {}; by_lang = {}
     for p in ISS.glob('*/*/*.json'):
         total += 1
-        with p.open('r', encoding='utf-8') as f:
-            doc = json.load(f)
+        doc = load_json(p)
         src = doc['source']; by_source[src] = by_source.get(src,0)+1
         lang = (doc.get('language') or 'unknown').lower()
         by_lang[lang] = by_lang.get(lang,0)+1

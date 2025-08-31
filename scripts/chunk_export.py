@@ -1,4 +1,5 @@
 import json, pathlib
+from json_utils import load_json
 
 ROOT = pathlib.Path('issuesdb/issues')
 OUTD = pathlib.Path('exports'); OUTD.mkdir(parents=True, exist_ok=True)
@@ -25,8 +26,7 @@ def chunks(text: str, max_chars=MAX_CHARS):
 
 def iter_issues():
     for p in ROOT.glob('*/*/*.json'):
-        with p.open('r', encoding='utf-8') as f:
-            yield json.load(f)
+        yield load_json(p)
 
 with OUTF.open('w', encoding='utf-8') as out:
     for doc in iter_issues():
