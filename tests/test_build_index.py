@@ -9,6 +9,7 @@ import pytest
 
 sys.path.append(str(pathlib.Path(__file__).resolve().parents[1] / 'scripts'))
 import build_index
+import memory_monitor
 
 
 def _write_issue(dir_path: pathlib.Path, idx: int) -> str:
@@ -101,7 +102,29 @@ def test_parse_args_env(monkeypatch):
     monkeypatch.delenv('ISSUES_KB_MEMORY_LIMIT_MB', raising=False)
 
 
-def test_memory_limit_reduces_batch_size(monkeypatch, tmp_path, caplog):
+@pytest.mark.parametrize(
+    ('argv', 'msg'),
+    [
+        (['--batch-size', '0'], '--batch-size must be between 1 and 10000'),
+        (['--batch-size', '10001'], '--batch-size must be between 1 and 10000'),
+        (['--memory-warn-mb', '0'], '--memory-warn-mb must be positive'),
+        (['--memory-limit-mb', '0'], '--memory-limit-mb must be positive'),
+    ],
+)
+def test_parse_args_validation(argv, msg):
+    with pytest.raises(ValueError) as excinfo:
+        build_index.parse_args(argv)
+    assert msg in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ('warn_mb', 'limit_mb', 'expected'),
+    [
+        (30, None, 'memory rss_mb'),
+        (30, 50, 'memory limit exceeded'),
+    ],
+)
+def test_memory_monitor_high_rss(monkeypatch, tmp_path, caplog, warn_mb, limit_mb, expected):
     root = tmp_path / 'issuesdb'
     issues_dir = root / 'issues' / 'src' / 'py'
     issues_dir.mkdir(parents=True)
@@ -116,20 +139,26 @@ def test_memory_limit_reduces_batch_size(monkeypatch, tmp_path, caplog):
     for i in range(5):
         _write_issue(issues_dir, i)
 
-    class FakeMonitor:
-        warn_mb = None
-        limit_mb = 50
-
+    class FakeProcess:
         def __init__(self, *_a, **_k):
             pass
 
-        def rss_mb(self):
-            return 100
+        def memory_info(self):
+            class Info:
+                rss = 120 * 1024 * 1024
 
-    monkeypatch.setattr(build_index, 'MemoryMonitor', lambda warn_mb, limit_mb: FakeMonitor())
+            return Info()
+
+    monkeypatch.setattr(memory_monitor.psutil, 'Process', lambda *_a, **_k: FakeProcess())
+
     caplog.set_level('WARNING')
-    build_index.main(['--batch-size', '4', '--memory-limit-mb', '50'])
-    assert any('memory limit exceeded' in r.message for r in caplog.records)
+    argv = ['--batch-size', '4', '--memory-warn-mb', str(warn_mb)]
+    if limit_mb is not None:
+        argv += ['--memory-limit-mb', str(limit_mb)]
+    build_index.main(argv)
+    assert any(expected in r.message for r in caplog.records)
+    if limit_mb is not None:
+        assert any('reducing batch_size=2' in r.message for r in caplog.records)
 
 
 def test_projected_memory_warning(monkeypatch, tmp_path, caplog):
