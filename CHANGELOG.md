@@ -8,3 +8,4 @@
 - Parametrized tests for batch-size and memory flags with psutil-based memory simulation.
 - `check_health.py` CLI for SQLite and FTS5 integrity validation.
 - Health check metrics, alerting, and atomic status file with interval skipping.
+- AlertManager writes active alerts to `alerts/active_alerts.json` with configurable thresholds.

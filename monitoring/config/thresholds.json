@@ -1,0 +1,8 @@
+{
+  "collection_success_rate": 0.95,
+  "index_build_time_seconds": 60,
+  "disk_usage_warn": 0.8,
+  "disk_usage_critical": 0.95,
+  "memory_usage_mb": 400,
+  "api_rate_limited_ratio": 0.1
+}

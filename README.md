@@ -65,6 +65,19 @@ mc.record("collect", "ok", duration_ms=120)
 
 Disable with `METRICS_ENABLED=false`.
 
+## Alert Manager
+
+Evaluate metrics and write active alerts to `alerts/active_alerts.json`:
+
+```python
+from monitoring.alert_manager import AlertManager, load_thresholds, parse_args
+thresholds = load_thresholds(parse_args([]))
+manager = AlertManager(thresholds)
+manager.check({"collection_success_rate": 0.9})
+```
+
+CLI flags or environment variables override defaults in `monitoring/config/thresholds.json`.
+
 ## Layout
 ```
 .
