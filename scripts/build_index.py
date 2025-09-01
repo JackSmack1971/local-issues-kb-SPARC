@@ -137,7 +137,9 @@ def delete_issue(cur: sqlite3.Cursor, issue_id: str) -> None:
     cur.execute('DELETE FROM issues WHERE issue_id=?', (issue_id,))
 
 
-def detect_changes(files: Iterable[Path], state: Dict[str, int]) -> Tuple[List[Path], List[str], Dict[str, int]]:
+def detect_changes(
+    files: Iterable[Path], state: Dict[str, int]
+) -> Tuple[List[Path], List[str], Dict[str, int]]:
     changed: List[Path] = []
     new_state: Dict[str, int] = {}
     for p in files:
@@ -150,6 +152,16 @@ def detect_changes(files: Iterable[Path], state: Dict[str, int]) -> Tuple[List[P
     return changed, removed, new_state
 
 
+def check_integrity(cur: sqlite3.Cursor) -> None:
+    """Validate FTS index and main database integrity."""
+
+    cur.execute("INSERT INTO fts_issues(fts_issues) VALUES('integrity-check')")
+    if cur.fetchall():
+        raise RuntimeError('fts_issues integrity check failed')
+    if cur.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
+        raise RuntimeError('database integrity check failed')
+
+
 def main() -> None:
     cid = uuid.uuid4().hex[:8]
     logger = get_logger(cid)
@@ -158,8 +170,14 @@ def main() -> None:
 
     files = list(iter_issue_files())
     changed, removed, new_state = detect_changes(files, state)
+    logger.info(
+        'scan complete total=%s changed=%s removed=%s',
+        len(files),
+        len(changed),
+        len(removed),
+    )
     if not changed and not removed and DB.exists():
-        logger.info(f'index up-to-date seconds={round(time.time() - start, 2)}')
+        logger.info('index up-to-date seconds=%s', round(time.time() - start, 2))
         return
 
     con = sqlite3.connect(DB)
@@ -178,16 +196,17 @@ def main() -> None:
         update_fts(cur, doc['issue_id'])
 
     cur.execute("INSERT INTO fts_issues(fts_issues, rank) VALUES('merge', 16)")
-    cur.execute("INSERT INTO fts_issues(fts_issues) VALUES('integrity-check')")
-    if cur.fetchall():
-        raise RuntimeError('fts_issues integrity check failed')
+    cur.execute("INSERT INTO fts_issues(fts_issues) VALUES('optimize')")
+    check_integrity(cur)
 
     con.commit()
     con.close()
     save_state(new_state)
     logger.info(
-        f'index build complete updated={len(changed)} removed={len(removed)} '
-        f'seconds={round(time.time() - start, 2)}'
+        'index build complete updated=%s removed=%s seconds=%s',
+        len(changed),
+        len(removed),
+        round(time.time() - start, 2),
     )
 
 
