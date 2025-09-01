@@ -35,5 +35,5 @@ USING fts5(
   title, summary, fix_steps, signals_concat, language,
   content='',
   tokenize='porter',
-  prefix='2,3,4'
+  prefix='2 3 4'
 );
