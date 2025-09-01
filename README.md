@@ -53,9 +53,16 @@ The command exits with a non-zero status when issues are found so it can be used
 
 ## Search
 
-Use the SQLite index for simple queries:
+Run `scripts/search.py` for FTS lookups with caching and basic metrics:
 
-```python
-from search import search
+```bash
+python - <<'PY'
+from scripts.search import search, get_metrics
 print(search('demo', 5))
+print(get_metrics())
+PY
 ```
+
+- **Caching:** `search()` uses an in-memory LRU cache so repeated queries return instantly.
+- **Metrics:** `get_metrics()` reports the number of queries and total seconds spent.
+- **Prefix queries:** each term is suffixed with `*` enabling prefix matches like `dem` → `demo`.
