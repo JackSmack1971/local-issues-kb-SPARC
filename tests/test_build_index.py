@@ -93,3 +93,41 @@ def test_batch_transactions(monkeypatch, tmp_path):
     expected_commits = (10 + 3 - 1) // 3 + 2  # batches + setup + final
     assert commit_calls == expected_commits
 
+
+def test_parse_args_env(monkeypatch):
+    monkeypatch.setenv('ISSUES_KB_MEMORY_LIMIT_MB', '321')
+    ns = build_index.parse_args([])
+    assert ns.memory_limit_mb == 321
+    monkeypatch.delenv('ISSUES_KB_MEMORY_LIMIT_MB', raising=False)
+
+
+def test_memory_limit_reduces_batch_size(monkeypatch, tmp_path, caplog):
+    root = tmp_path / 'issuesdb'
+    issues_dir = root / 'issues' / 'src' / 'py'
+    issues_dir.mkdir(parents=True)
+
+    sql_path = pathlib.Path(__file__).resolve().parents[1] / 'issues_index.sql'
+    monkeypatch.setattr(build_index, 'ROOT', root)
+    monkeypatch.setattr(build_index, 'DB', root / 'issues.sqlite')
+    monkeypatch.setattr(build_index, 'SQL', sql_path)
+    monkeypatch.setattr(build_index, 'STATE', root / 'index_state.json')
+    monkeypatch.setattr(build_index, 'LOG_INTERVAL', 1)
+
+    for i in range(5):
+        _write_issue(issues_dir, i)
+
+    class FakeMonitor:
+        warn_mb = None
+        limit_mb = 50
+
+        def __init__(self, *_a, **_k):
+            pass
+
+        def rss_mb(self):
+            return 100
+
+    monkeypatch.setattr(build_index, 'MemoryMonitor', lambda warn_mb, limit_mb: FakeMonitor())
+    caplog.set_level('WARNING')
+    build_index.main(['--batch-size', '4', '--memory-limit-mb', '50'])
+    assert any('memory limit exceeded' in r.message for r in caplog.records)
+
