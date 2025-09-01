@@ -47,5 +47,15 @@ The command exits with a non-zero status when issues are found so it can be used
    ├─ build_index.py
    ├─ chunk_export.py
    ├─ render_memory_bank.py
+   ├─ search.py
    └─ security_scan.py
+```
+
+## Search
+
+Use the SQLite index for simple queries:
+
+```python
+from search import search
+print(search('demo', 5))
 ```
