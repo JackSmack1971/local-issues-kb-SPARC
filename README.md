@@ -30,6 +30,9 @@ Verify the SQLite database and FTS5 index integrity:
 python scripts/check_health.py --check-health
 ```
 
+The run writes the latest status to `metrics/health_status.json` and records a
+`check_health` metric. Set `HEALTH_CHECK_INTERVAL_MIN` to skip repeated runs.
+
 ### Memory Controls
 
 `scripts/build_index.py` estimates memory usage before indexing. It warns when

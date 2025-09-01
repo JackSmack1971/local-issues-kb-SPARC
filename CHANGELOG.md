@@ -7,3 +7,4 @@
 - Require `psutil>=5.9.0` and document setup dependency.
 - Parametrized tests for batch-size and memory flags with psutil-based memory simulation.
 - `check_health.py` CLI for SQLite and FTS5 integrity validation.
+- Health check metrics, alerting, and atomic status file with interval skipping.

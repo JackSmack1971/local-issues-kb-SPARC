@@ -1,3 +1,4 @@
+import json
 import pathlib
 import sqlite3
 import sys
@@ -22,13 +23,33 @@ def _init_db(db_path: pathlib.Path) -> None:
     con.close()
 
 
-def test_check_fts5_integrity_ok(tmp_path):
+def test_main_ok(tmp_path, monkeypatch):
     db = tmp_path / 'db.sqlite'
     _init_db(db)
-    check_health.check_fts5_integrity(db)
+    monkeypatch.chdir(tmp_path)
+
+    events = []
+
+    def fake_record(self, event_type, status, **kw):
+        events.append((event_type, status, kw))
+
+    critical = []
+
+    def fake_critical(self, message):
+        critical.append(message)
+
+    monkeypatch.setattr(check_health.MetricsCollector, 'record', fake_record)
+    monkeypatch.setattr(check_health.AlertManager, 'critical', fake_critical)
+
+    check_health.main(['--check-health', '--db-path', str(db)])
+
+    status = json.loads((tmp_path / 'metrics/health_status.json').read_text())
+    assert status['status'] == 'ok'
+    assert events == [('check_health', 'success', {})]
+    assert critical == []
 
 
-def test_check_fts5_integrity_corrupted(tmp_path):
+def test_main_corrupted(tmp_path, monkeypatch):
     db = tmp_path / 'db.sqlite'
     _init_db(db)
     con = sqlite3.connect(db)
@@ -40,5 +61,26 @@ def test_check_fts5_integrity_corrupted(tmp_path):
     cur.execute('DROP TABLE fts_issues_data')
     con.commit()
     con.close()
-    with pytest.raises(RuntimeError):
-        check_health.check_fts5_integrity(db)
+
+    monkeypatch.chdir(tmp_path)
+
+    events = []
+
+    def fake_record(self, event_type, status, **kw):
+        events.append((event_type, status, kw))
+
+    critical = []
+
+    def fake_critical(self, message):
+        critical.append(message)
+
+    monkeypatch.setattr(check_health.MetricsCollector, 'record', fake_record)
+    monkeypatch.setattr(check_health.AlertManager, 'critical', fake_critical)
+
+    with pytest.raises(SystemExit):
+        check_health.main(['--check-health', '--db-path', str(db)])
+
+    status = json.loads((tmp_path / 'metrics/health_status.json').read_text())
+    assert status['status'] == 'error'
+    assert events and events[0][1] == 'failure'
+    assert critical
