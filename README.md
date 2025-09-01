@@ -22,6 +22,14 @@ python scripts/chunk_export.py
 python scripts/render_memory_bank.py
 ```
 
+### Health Check
+
+Verify the SQLite database and FTS5 index integrity:
+
+```bash
+python scripts/check_health.py --check-health
+```
+
 ### Memory Controls
 
 `scripts/build_index.py` estimates memory usage before indexing. It warns when
