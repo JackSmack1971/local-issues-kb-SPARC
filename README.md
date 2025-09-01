@@ -50,6 +50,18 @@ python scripts/security_scan.py scripts
 
 The command exits with a non-zero status when issues are found so it can be used in CI workflows.
 
+## Metrics Collector
+
+Record operational events in daily JSONL files:
+
+```python
+from monitoring.metrics_collector import MetricsCollector
+mc = MetricsCollector()
+mc.record("collect", "ok", duration_ms=120)
+```
+
+Disable with `METRICS_ENABLED=false`.
+
 ## Layout
 ```
 .
