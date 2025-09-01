@@ -16,6 +16,16 @@ python scripts/chunk_export.py
 python scripts/render_memory_bank.py
 ```
 
+### Memory Controls
+
+`scripts/build_index.py` estimates memory usage before indexing. It warns when
+`issues * batch_size` exceeds `--memory-warn-mb` and aborts when above
+`--memory-limit-mb`:
+
+```bash
+python scripts/build_index.py --batch-size 500 --memory-warn-mb 2000 --memory-limit-mb 4000
+```
+
 ## Security Scan
 
 Scan the repository for potential secrets, missing input validation, and unsafe SQL usage:
