@@ -59,3 +59,37 @@ def test_incremental_build(monkeypatch, tmp_path):
     assert cur.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
     con.close()
 
+
+def test_batch_transactions(monkeypatch, tmp_path):
+    root = tmp_path / 'issuesdb'
+    issues_dir = root / 'issues' / 'src' / 'py'
+    issues_dir.mkdir(parents=True)
+
+    sql_path = pathlib.Path(__file__).resolve().parents[1] / 'issues_index.sql'
+    monkeypatch.setattr(build_index, 'ROOT', root)
+    monkeypatch.setattr(build_index, 'DB', root / 'issues.sqlite')
+    monkeypatch.setattr(build_index, 'SQL', sql_path)
+    monkeypatch.setattr(build_index, 'STATE', root / 'index_state.json')
+
+    for i in range(10):
+        _write_issue(issues_dir, i)
+
+    commit_calls = 0
+
+    class CountingConnection(sqlite3.Connection):
+        def commit(self):
+            nonlocal commit_calls
+            commit_calls += 1
+            return super().commit()
+
+    orig_connect = sqlite3.connect
+
+    def counting_connect(*args, **kwargs):
+        kwargs['factory'] = CountingConnection
+        return orig_connect(*args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, 'connect', counting_connect)
+    build_index.main(['--batch-size', '3'])
+    expected_commits = (10 + 3 - 1) // 3 + 2  # batches + setup + final
+    assert commit_calls == expected_commits
+

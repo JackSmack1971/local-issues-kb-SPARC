@@ -6,7 +6,7 @@ rebuild time for large datasets. The index is optimized using FTS5 merge operati
 an `automerge` configuration. After updates, an integrity check validates index health.
 
 Usage:
-    python scripts/build_index.py
+    python scripts/build_index.py [--batch-size N]
 """
 
 from __future__ import annotations
@@ -17,7 +17,8 @@ import sqlite3
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+import argparse
+from typing import Dict, Iterable, List, Optional
 
 from json_utils import load_json
 
@@ -40,7 +41,7 @@ def get_logger(correlation_id: str) -> logging.LoggerAdapter:
 
 
 def iter_issue_files() -> Iterable[Path]:
-    """Yield all JSON issue files."""
+    """Yield all JSON issue files lazily."""
 
     return (ROOT / 'issues').glob('*/*/*.json')
 
@@ -137,19 +138,13 @@ def delete_issue(cur: sqlite3.Cursor, issue_id: str) -> None:
     cur.execute('DELETE FROM issues WHERE issue_id=?', (issue_id,))
 
 
-def detect_changes(
-    files: Iterable[Path], state: Dict[str, int]
-) -> Tuple[List[Path], List[str], Dict[str, int]]:
-    changed: List[Path] = []
-    new_state: Dict[str, int] = {}
-    for p in files:
-        mtime = int(p.stat().st_mtime_ns)
-        key = str(p.relative_to(ROOT))
-        new_state[key] = mtime
-        if state.get(key) != mtime:
-            changed.append(p)
-    removed = [key for key in state.keys() if key not in new_state]
-    return changed, removed, new_state
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--batch-size', type=int, default=1000)
+    args = ap.parse_args(argv)
+    if not 1 <= args.batch_size <= 10000:
+        raise ValueError('--batch-size must be between 1 and 10000')
+    return args
 
 
 def check_integrity(cur: sqlite3.Cursor) -> None:
@@ -162,49 +157,76 @@ def check_integrity(cur: sqlite3.Cursor) -> None:
         raise RuntimeError('database integrity check failed')
 
 
-def main() -> None:
+def process_batch(con: sqlite3.Connection, cur: sqlite3.Cursor, batch: List[Dict[str, object]]) -> None:
+    con.execute('BEGIN')
+    for doc in batch:
+        upsert_issue(cur, doc)
+        update_fts(cur, doc['issue_id'])
+    con.commit()
+
+
+def main(argv: Optional[List[str]] = None) -> None:
+    args = parse_args(argv or [])
+
     cid = uuid.uuid4().hex[:8]
     logger = get_logger(cid)
     start = time.time()
     state = load_state()
-
-    files = list(iter_issue_files())
-    changed, removed, new_state = detect_changes(files, state)
-    logger.info(
-        'scan complete total=%s changed=%s removed=%s',
-        len(files),
-        len(changed),
-        len(removed),
-    )
-    if not changed and not removed and DB.exists():
-        logger.info('index up-to-date seconds=%s', round(time.time() - start, 2))
-        return
+    removed_keys = set(state.keys())
+    new_state: Dict[str, int] = {}
+    total = 0
+    changed = 0
 
     con = sqlite3.connect(DB)
     cur = con.cursor()
     cur.executescript(SQL.read_text(encoding='utf-8'))
     cur.execute('PRAGMA journal_mode=WAL;')
     cur.execute("INSERT INTO fts_issues(fts_issues, rank) VALUES('automerge', 4)")
+    con.commit()
 
-    for key in removed:
-        issue_id = Path(key).stem
-        delete_issue(cur, issue_id)
+    batch: List[Dict[str, object]] = []
+    for path in iter_issue_files():
+        total += 1
+        mtime = int(path.stat().st_mtime_ns)
+        key = str(path.relative_to(ROOT))
+        new_state[key] = mtime
+        removed_keys.discard(key)
+        if state.get(key) != mtime:
+            doc = load_json(path)
+            batch.append(doc)
+            changed += 1
+            if len(batch) >= args.batch_size:
+                process_batch(con, cur, batch)
+                batch.clear()
 
-    for path in changed:
-        doc = load_json(path)
-        upsert_issue(cur, doc)
-        update_fts(cur, doc['issue_id'])
+    if batch:
+        process_batch(con, cur, batch)
+        batch.clear()
 
+    removed = list(removed_keys)
+    logger.info('scan complete total=%s changed=%s removed=%s', total, changed, len(removed))
+    if not changed and not removed and DB.exists():
+        con.close()
+        logger.info('index up-to-date seconds=%s', round(time.time() - start, 2))
+        return
+
+    if removed:
+        con.execute('BEGIN')
+        for key in removed:
+            delete_issue(cur, Path(key).stem)
+        con.commit()
+
+    con.execute('BEGIN')
     cur.execute("INSERT INTO fts_issues(fts_issues, rank) VALUES('merge', 16)")
     cur.execute("INSERT INTO fts_issues(fts_issues) VALUES('optimize')")
     check_integrity(cur)
-
     con.commit()
     con.close()
+
     save_state(new_state)
     logger.info(
         'index build complete updated=%s removed=%s seconds=%s',
-        len(changed),
+        changed,
         len(removed),
         round(time.time() - start, 2),
     )
