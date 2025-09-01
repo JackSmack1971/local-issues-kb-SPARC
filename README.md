@@ -7,9 +7,15 @@ This repository is a local-only, file-first knowledge base for programming issue
 - Search index: a single SQLite database with FTS5 (`issuesdb/issues.sqlite`) built from files.
 - Agent-ready chunks: export to `exports/chunks.jsonl` (one record per chunk with metadata).
 
-## Quick Start
+## Setup
+Install the Python dependencies, including `psutil>=5.9.0` for cross-platform memory stats:
+
 ```bash
 pip install -r requirements.txt
+```
+
+## Quick Start
+```bash
 python scripts/collect_sonar.py --base https://sonarcloud.io --langs py --limit 200
 python scripts/build_index.py
 python scripts/chunk_export.py
