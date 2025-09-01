@@ -56,5 +56,6 @@ def test_incremental_build(monkeypatch, tmp_path):
     con = sqlite3.connect(root / 'issues.sqlite')
     cur = con.cursor()
     assert cur.execute('SELECT COUNT(*) FROM issues').fetchone()[0] == 1001
+    assert cur.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
     con.close()
 
