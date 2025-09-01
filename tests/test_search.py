@@ -23,32 +23,44 @@ def create_db(tmp_path: Path) -> Path:
         );
         CREATE VIRTUAL TABLE fts_issues USING fts5(
             title, summary, fix_steps, signals_concat, language,
-            content=''
+            content='', prefix='2 3 4'
         );
         '''
     )
-    cur.execute(
-        'INSERT INTO issues(issue_id,title,summary,fix_steps,language) VALUES (?,?,?,?,?)',
-        ('id1', 'Example rule', 'Demo summary', 'Do something', 'py'),
-    )
-    rowid = cur.execute('SELECT rowid FROM issues WHERE issue_id=?', ('id1',)).fetchone()[0]
-    cur.execute(
-        'INSERT INTO fts_issues(rowid,title,summary,fix_steps,signals_concat,language) '
-        'VALUES (?,?,?,?,?,?)',
-        (rowid, 'Example rule', 'Demo summary', 'Do something', '', 'py'),
-    )
+    sample_rows = [
+        ('id1', 'Network hiccup', 'Network glitch', 'Restart network', 'py'),
+        (
+            'id2',
+            'Network network problem',
+            'Network network network failure',
+            'Network network reset',
+            'py',
+        ),
+    ]
+    for issue in sample_rows:
+        cur.execute(
+            'INSERT INTO issues(issue_id,title,summary,fix_steps,language) VALUES (?,?,?,?,?)',
+            issue,
+        )
+        rowid = cur.execute('SELECT rowid FROM issues WHERE issue_id=?', (issue[0],)).fetchone()[0]
+        cur.execute(
+            'INSERT INTO fts_issues(rowid,title,summary,fix_steps,signals_concat,language) '
+            'VALUES (?,?,?,?,?,?)',
+            (rowid, issue[1], issue[2], issue[3], '', issue[4]),
+        )
     con.commit()
     con.close()
     return db_path
 
 
-def test_query_fts_prefix_and_metrics(tmp_path: Path) -> None:
+def test_query_fts_orders_by_bm25_and_prefix(tmp_path: Path) -> None:
     db = create_db(tmp_path)
     before = search_module.get_metrics()
-    rows = search_module.query_fts(db, 'Exam', 5)
-    assert rows and rows[0]['issue_id'] == 'id1'
+    rows = search_module.query_fts(db, 'netw', 5)
+    assert [r['issue_id'] for r in rows] == ['id2', 'id1']
     after = search_module.get_metrics()
     assert after['queries'] == before.get('queries', 0) + 1
+    assert after['seconds_total'] > before.get('seconds_total', 0)
 
 
 def test_search_uses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
