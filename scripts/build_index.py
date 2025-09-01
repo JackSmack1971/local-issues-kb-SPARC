@@ -11,22 +11,26 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
+import os
 import sqlite3
 import time
 import uuid
 from pathlib import Path
-import argparse
 from typing import Dict, Iterable, List, Optional
 
 from json_utils import load_json
+from memory_monitor import MemoryMonitor
 
 
 ROOT = Path('issuesdb')
 DB = ROOT / 'issues.sqlite'
 SQL = Path('issues_index.sql')
 STATE = ROOT / 'index_state.json'
+
+LOG_INTERVAL = 5000
 
 
 def get_logger(correlation_id: str) -> logging.LoggerAdapter:
@@ -141,9 +145,21 @@ def delete_issue(cur: sqlite3.Cursor, issue_id: str) -> None:
 def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     ap = argparse.ArgumentParser()
     ap.add_argument('--batch-size', type=int, default=1000)
+    ap.add_argument('--memory-warn-mb', type=int)
+    ap.add_argument('--memory-limit-mb', type=int)
     args = ap.parse_args(argv)
     if not 1 <= args.batch_size <= 10000:
         raise ValueError('--batch-size must be between 1 and 10000')
+    env_limit = os.getenv('ISSUES_KB_MEMORY_LIMIT_MB')
+    if args.memory_limit_mb is None and env_limit:
+        try:
+            args.memory_limit_mb = int(env_limit)
+        except ValueError as exc:
+            raise ValueError('ISSUES_KB_MEMORY_LIMIT_MB must be an integer') from exc
+    for name in ('memory_warn_mb', 'memory_limit_mb'):
+        val = getattr(args, name)
+        if val is not None and val <= 0:
+            raise ValueError(f'--{name.replace("_", "-")} must be positive')
     return args
 
 
@@ -177,6 +193,8 @@ def main(argv: Optional[List[str]] = None) -> None:
     total = 0
     changed = 0
 
+    monitor = MemoryMonitor(args.memory_warn_mb, args.memory_limit_mb)
+
     con = sqlite3.connect(DB)
     cur = con.cursor()
     cur.executescript(SQL.read_text(encoding='utf-8'))
@@ -198,7 +216,20 @@ def main(argv: Optional[List[str]] = None) -> None:
             if len(batch) >= args.batch_size:
                 process_batch(con, cur, batch)
                 batch.clear()
-
+        if total % LOG_INTERVAL == 0:
+            rss = monitor.rss_mb()
+            level = logging.INFO
+            if monitor.warn_mb and rss >= monitor.warn_mb:
+                level = logging.WARNING
+            logger.log(level, 'memory rss_mb=%s batch_size=%s', round(rss, 1), args.batch_size)
+            if monitor.limit_mb and rss >= monitor.limit_mb:
+                args.batch_size = max(1, args.batch_size // 2)
+                logger.warning(
+                    'memory limit exceeded rss_mb=%s limit_mb=%s reducing batch_size=%s',
+                    round(rss, 1),
+                    monitor.limit_mb,
+                    args.batch_size,
+                )
     if batch:
         process_batch(con, cur, batch)
         batch.clear()
