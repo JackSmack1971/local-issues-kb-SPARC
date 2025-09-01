@@ -131,3 +131,41 @@ def test_memory_limit_reduces_batch_size(monkeypatch, tmp_path, caplog):
     build_index.main(['--batch-size', '4', '--memory-limit-mb', '50'])
     assert any('memory limit exceeded' in r.message for r in caplog.records)
 
+
+def test_projected_memory_warning(monkeypatch, tmp_path, caplog):
+    root = tmp_path / 'issuesdb'
+    issues_dir = root / 'issues' / 'src' / 'py'
+    issues_dir.mkdir(parents=True)
+
+    sql_path = pathlib.Path(__file__).resolve().parents[1] / 'issues_index.sql'
+    monkeypatch.setattr(build_index, 'ROOT', root)
+    monkeypatch.setattr(build_index, 'DB', root / 'issues.sqlite')
+    monkeypatch.setattr(build_index, 'SQL', sql_path)
+    monkeypatch.setattr(build_index, 'STATE', root / 'index_state.json')
+
+    for i in range(3):
+        _write_issue(issues_dir, i)
+
+    caplog.set_level('WARNING')
+    build_index.main(['--batch-size', '5', '--memory-warn-mb', '10', '--memory-limit-mb', '100'])
+    assert any('projected memory usage' in r.message for r in caplog.records)
+
+
+def test_projected_memory_limit_exits(monkeypatch, tmp_path):
+    root = tmp_path / 'issuesdb'
+    issues_dir = root / 'issues' / 'src' / 'py'
+    issues_dir.mkdir(parents=True)
+
+    sql_path = pathlib.Path(__file__).resolve().parents[1] / 'issues_index.sql'
+    monkeypatch.setattr(build_index, 'ROOT', root)
+    monkeypatch.setattr(build_index, 'DB', root / 'issues.sqlite')
+    monkeypatch.setattr(build_index, 'SQL', sql_path)
+    monkeypatch.setattr(build_index, 'STATE', root / 'index_state.json')
+
+    for i in range(5):
+        _write_issue(issues_dir, i)
+
+    with pytest.raises(SystemExit) as excinfo:
+        build_index.main(['--batch-size', '5', '--memory-limit-mb', '20'])
+    assert 'projected memory' in str(excinfo.value)
+

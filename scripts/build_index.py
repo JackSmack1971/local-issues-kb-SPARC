@@ -186,6 +186,20 @@ def main(argv: Optional[List[str]] = None) -> None:
 
     cid = uuid.uuid4().hex[:8]
     logger = get_logger(cid)
+    total_files = sum(1 for _ in iter_issue_files())
+    projected_mb = total_files * args.batch_size
+    if args.memory_limit_mb and projected_mb > args.memory_limit_mb:
+        raise SystemExit(
+            f'projected memory {projected_mb}MB exceeds limit {args.memory_limit_mb}MB'
+        )
+    if args.memory_warn_mb and projected_mb > args.memory_warn_mb:
+        logger.warning(
+            'projected memory usage projected_mb=%s warn_mb=%s',
+            projected_mb,
+            args.memory_warn_mb,
+        )
+    logger.info('total issue files=%s projected_mb=%s', total_files, projected_mb)
+
     start = time.time()
     state = load_state()
     removed_keys = set(state.keys())
